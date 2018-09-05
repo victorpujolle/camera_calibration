@@ -54,6 +54,9 @@ gsl_matrix* Rot_zxz(const double thetad, const double phid, const double psid);
 // this function is the function we want to minimize it returns the standart deviation of the pixel offset
 double cost_function(gsl_vector* X, void* parameters);
 
+// this function is the function we want to minimize it returns the standart deviation of the pixel offset
+double cost_function(gsl_vector* X, void* parameters);
+
 // this function will find the optimal camera parameters
 int optimizer(Global_parameters parameters);
 
