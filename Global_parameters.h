@@ -33,4 +33,20 @@ public:
     int optimizer();
 };
 
+struct parameters
+{
+    gsl_matrix* calib_data;      // calibration data
+    size_t len_data;
+    double range_dm;        // deviation scale of mask position
+    double range_dc;        // deviation scale of camera mount offset
+    double range_df;        // deviation scale of focal length value
+    double range_dpx;       // deviation scale of pixel offset
+    double range_angle;     // deviation scale of pixel angular offsets
+    double marker_rotation; // marker rotation - marker may positioned with 0, 90, 180, 270 degrees rotation
+    gsl_matrix *px1,*px2, *M0, *f;    // values derived from transform matrix
+    gsl_matrix* T_cb[]; // array of matrix
+    int minval; // initial minimum value
+    int repeat_no;
+};
+
 #endif //ROBOT_CAMERA_CALIBRATION_UTILS_STRUCT_H

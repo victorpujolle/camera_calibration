@@ -14,14 +14,18 @@ int main() {
     printf("- deleting zero detection lines done -- %lu lines deleted --\n",file_data->size1-data->size1);
 
     // setup the first global parameters of the problem
-    Global_parameters param = Global_parameters(data);
+    //Global_parameters param = Global_parameters(data);
+    //printf("- setting the global parameters done\n");
+
+    // setup the first global parameters of the problem
+    parameters param = set_parameters(data);
     printf("- setting the global parameters done\n");
 
     //Optimization of the parameters
-    param.optimizer();
-    printf("- optimizing the parameters done\n");
+    optimizer(&param);
+    //printf("- optimizing the parameters done\n");
 
-    printf("ic\n");
+    printf("- end\n");
 
     return 0;
 }
