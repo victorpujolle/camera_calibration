@@ -18,8 +18,10 @@ int main() {
     printf("- setting the global parameters done\n");
 
     //Optimization of the parameters
-    optimizer(param);
+    param.optimizer();
     printf("- optimizing the parameters done\n");
+
+    printf("ic\n");
 
     return 0;
 }

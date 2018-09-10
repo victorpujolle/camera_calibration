@@ -38,6 +38,15 @@ int print_matrix(const gsl_matrix *mat);
 // this function prints a gsl vector
 int print_vector(const gsl_vector* vect);
 
+// computes the mean of the vector
+double vector_mean(const gsl_vector* u);
+
+// this function modifies the input vector u <- (u- mean(u)).^2
+int vector_variance_element(gsl_vector* u);
+
+// applies sqrt to each element of the vector u
+int vector_sqrt_element(gsl_vector* u);
+
 // this function reads a cvs file and modifies the array data, it works, do not touch it !
 //the file sould has 3 rows
 int read_csv(const char *filename, gsl_matrix* data);
@@ -51,11 +60,6 @@ gsl_matrix* Rotd_axis(const int axis, const double q);
 // this function returns the rotation matrix following the angles thetad,phid,psid
 gsl_matrix* Rot_zxz(const double thetad, const double phid, const double psid);
 
-// this function is the function we want to minimize it returns the standart deviation of the pixel offset
-double cost_function(gsl_vector* X, void* parameters);
-
-// this function is the function we want to minimize it returns the standart deviation of the pixel offset
-double cost_function(gsl_vector* X, void* parameters);
 
 // this function will find the optimal camera parameters
 int optimizer(Global_parameters parameters);

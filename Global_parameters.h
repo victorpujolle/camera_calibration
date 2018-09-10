@@ -29,6 +29,8 @@ public:
     int repeat_no;
                                                          
     Global_parameters(gsl_matrix* calib_data, double range_dm=0.10, double range_dc=0.05, double range_df=30, double range_dpx=30, double range_angle=10, double inmarker_rotation=0, int minval=100, int repeat_no=50);
+    double cost_function(gsl_vector* X);
+    int optimizer();
 };
 
 #endif //ROBOT_CAMERA_CALIBRATION_UTILS_STRUCT_H
