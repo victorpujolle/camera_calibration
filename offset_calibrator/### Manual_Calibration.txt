@@ -1,0 +1,11 @@
+I. In indy control app,
+ 1. List file: pose_list_calib.txt
+ 2. Load List
+ 3. 리스트에서 차례대로 set pose, pick calib point
+ 4. Save Calib data
+
+II. In matlab
+ 1. run calib_offset.m
+
+III. In indy control app,
+ 1. enter dx, dy, dz, dpx, dpy

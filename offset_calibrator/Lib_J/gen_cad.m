@@ -1,0 +1,21 @@
+Tunit=1/1000;
+model_path='F:/dataset/hinterstoisser/models/obj_13.ply';
+save_path='F:/dataset/hinterstoisser/models/cad13.mat';
+model = pcread(model_path);
+XLimits=model.XLimits*Tunit;
+YLimits=model.YLimits*Tunit;
+ZLimits=model.ZLimits*Tunit;
+cad.vertices = model.Location*Tunit;
+cad.pnames = {'ff','ft','fl','fr','bt','bl','br'};
+cad.ff=[0.1291,0,-0.06474];
+cad.ft=[0.058,0,0.05287];
+cad.fl=[0.006803,0.05702,-0.06241];
+cad.fr=[0.006803,-0.05702,-0.06241];
+cad.bt=[-0.1133,0,0.06962];
+cad.bl=[-0.1289,0.0414,-0.03637];
+cad.br=[-0.1289,-0.0414,-0.03637];
+% cad.lines=[1,2;1,3;1,4;2,3;2,4;3,4;2,5;3,6;4,7;5,6;5,7;6,7;];
+cad.lines=[1,2;1,3;1,4;2,3;2,4;2,5;3,6;4,7;5,6;5,7];
+save(save_path,'cad');
+plot3(cad.vertices(:,1),cad.vertices(:,2),cad.vertices(:,3),'.');
+
