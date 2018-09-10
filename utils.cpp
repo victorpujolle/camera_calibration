@@ -1,5 +1,6 @@
 #include <gsl/gsl_vector_double.h>
 #include <gsl/gsl_matrix.h>
+#include <gsl/gsl_multimin.h>
 #include "utils.h"
 
 
@@ -60,6 +61,22 @@ double vector_mean(const gsl_vector* u)
     }
     mean /= usize;
     return mean;
+};
+
+// computes the std of the vector
+double vector_std(const gsl_vector* u)
+{
+    int size = u->size;
+    double sum = 0;
+    double sum_square = 0;
+    for (int i = 0 ; i < size ; i++)
+    {
+        sum += gsl_vector_get(u,i);
+        sum_square += pow(gsl_vector_get(u,i),2);
+    }
+
+    double res = sum_square/pow(size,2) - pow(sum/size,2);
+    return res;
 };
 
 // this function modifies the input vector u <- (u- mean(u)).^2
@@ -540,7 +557,8 @@ parameters set_parameters(gsl_matrix* incalib_data, double inrange_dm, double in
 {
     /* initialization of the global parameters */
     parameters param;
-    param.calib_data = incalib_data;
+    param.calib_data = gsl_matrix_alloc(incalib_data->size1,incalib_data->size2);
+    gsl_matrix_memcpy(param.calib_data, incalib_data);
     param.range_dm = inrange_dm;
     param.range_dc = inrange_dc;
     param.range_df = inrange_df;
@@ -550,8 +568,8 @@ parameters set_parameters(gsl_matrix* incalib_data, double inrange_dm, double in
     param.minval = inminval;
     param.repeat_no = inrepeat_no;
     param.len_data = incalib_data->size1;
-    int len_data = param.calib_data->size1;
-    //calib_data = incalib_data;
+    size_t len_data = param.calib_data->size1;
+
     /* setting of px */
     param.px1 = gsl_matrix_alloc(len_data,4);
     param.px2 = gsl_matrix_alloc(len_data,4);
@@ -678,12 +696,11 @@ parameters set_parameters(gsl_matrix* incalib_data, double inrange_dm, double in
             gsl_matrix_set(param.T_cb[i_d],i,3,gsl_matrix_get(RtP,i,0));
         }
     }
-
     return param;
 }
 
 // this is the functions one should optimize
-double _cost_function(gsl_vector* X, void* inparam)
+double cost_function(const gsl_vector *X, void *inparam)
 {
     parameters* param = (parameters*) inparam;
     /* multiply normalized calibration variables with scales */
@@ -845,16 +862,203 @@ double _cost_function(gsl_vector* X, void* inparam)
     return std_uv;
 }
 
+// this function computes the final offset
+int calc_offset(gsl_vector* X, parameters* param, gsl_vector* res_u, gsl_vector* res_v, gsl_vector* other_res)
+{
+    /* res_u, res_v and other_res are calculated in the function
+     * other_res =  [mean_u, mean_v, std_u, std_v, mean_err]
+     * the size of res_u and res_v is 84
+     */
+
+    /*  X = dx,dy,dz,df,dd,theta,phi,psi */
+    double range_dm = param->range_dm;
+    double range_dc = param->range_dc;
+    double range_df = param->range_df;
+    double range_dpx = param->range_dpx;
+    double range_angle = param->range_angle;
+    double marker_rotation = param->marker_rotation;
+
+    int len_data = param->len_data;
+    double dfx = gsl_vector_get(X,0)*range_df;
+    double dfy = gsl_vector_get(X,1)*range_df;
+    double dcx = gsl_vector_get(X,2)*range_dpx;
+    double dcy = gsl_vector_get(X,3)*range_dpx;
+    double dxc = gsl_vector_get(X,4)*range_dc;
+    double dyc = gsl_vector_get(X,5)*range_dc;
+    double dzc = gsl_vector_get(X,6)*range_dc;
+    double dac = gsl_vector_get(X,7)*range_angle;
+    double dbc = gsl_vector_get(X,8)*range_angle;
+    double dcc = gsl_vector_get(X,9)*range_angle;
+    double dxm = gsl_vector_get(X,10)*range_dm;
+    double dym = gsl_vector_get(X,11)*range_dm;
+    double dzm = gsl_vector_get(X,12)*range_dm;
+    double dam = gsl_vector_get(X,13)*range_angle;
+    double dbm = gsl_vector_get(X,14)*range_angle;
+    double dcm = gsl_vector_get(X,15)*range_angle;
+
+    /* marker location */
+    gsl_matrix* R_m = Rot_zxz(0,0,marker_rotation);
+
+    /* camera offset */
+    gsl_matrix* T_cc = gsl_matrix_calloc(4,4); // T_cc = [Rot_zxz(dac,dbc,dcc), [dxc;dyc;dzc];0,0,0,1]
+    gsl_matrix* Rot_zxz_dac_dbc_dcc = Rot_zxz(dac,dbc,dcc);
+
+    for (int i = 0 ; i < 3 ; i++)
+    {
+        for (int j = 0 ; j < 3 ; j++)
+        {
+            gsl_matrix_set(T_cc,i,j,gsl_matrix_get(Rot_zxz_dac_dbc_dcc,i,j));
+        }
+    }
+    gsl_matrix_set(T_cc,0,3,dxc);
+    gsl_matrix_set(T_cc,1,3,dyc);
+    gsl_matrix_set(T_cc,2,3,dzc);
+    gsl_matrix_set(T_cc,3,3,1);
+
+    /* base offset */
+    gsl_matrix* T_bb = gsl_matrix_calloc(4,4); // T_cc = [Rot_zxz(dac,dbc,dcc), [dxc;dyc;dzc];0,0,0,1]
+    gsl_matrix* Rot_zyx_dam_dbm_dcm = Rot_zyx(dam,dbm,dcm);
+    for (int i = 0 ; i < 3 ; i++)
+    {
+        for (int j = 0 ; j < 3 ; j++)
+        {
+            gsl_matrix_set(T_bb,i,j,gsl_matrix_get(Rot_zyx_dam_dbm_dcm,i,j));
+        }
+    }
+    gsl_matrix_set(T_bb,0,3,dxm);
+    gsl_matrix_set(T_bb,1,3,dym);
+    gsl_matrix_set(T_bb,2,3,dzm);
+    gsl_matrix_set(T_bb,3,3,1);
+
+    /* corners: marker is 10cm square shape */
+    gsl_matrix* corners = gsl_matrix_calloc(4,3);
+    gsl_matrix_set(corners,0,0,-0.05); gsl_matrix_set(corners,0,1,0.05);
+    gsl_matrix_set(corners,1,0,0.05);  gsl_matrix_set(corners,1,1,0.05);
+    gsl_matrix_set(corners,2,0,0.05);  gsl_matrix_set(corners,2,1,-0.05);
+    gsl_matrix_set(corners,3,0,-0.05); gsl_matrix_set(corners,3,1,-0.05);
+
+    /* camera matrix */
+    gsl_matrix* K_c = gsl_matrix_calloc(3,4);
+    gsl_matrix_set(K_c,0,0, gsl_matrix_get(param->f,0,0)+dfx );
+    gsl_matrix_set(K_c,0,2, 320+dcx );
+    gsl_matrix_set(K_c,1,1, gsl_matrix_get(param->f,1,0)+dfy );
+    gsl_matrix_set(K_c,1,2, 240+dcy );
+    gsl_matrix_set(K_c,2,2, 1 );
+
+    /* initializing the variables used during the iterations */
+    gsl_vector* corners_j = gsl_vector_alloc(3); // corners(J,:)
+    gsl_vector* M0_i = gsl_vector_alloc(3); // M0(I,:) first, then (M0(I,:)'+R_m*corners(J,:)')
+    gsl_vector* row_P_cc = gsl_vector_alloc(4);
+    gsl_vector* row_tmpP_cc = gsl_vector_alloc(4);
+    gsl_matrix* P_cc[len_data]; // P_cc(I,J,:)=T_cc*squeeze(T_cb(I,:,:))*T_bb*[(M0(I,:)'+R_m*corners(J,:)');1]
+    gsl_vector* row_x_c = gsl_vector_alloc(3);
+    gsl_matrix* px_c[len_data];
+
+    for (int i = 0 ; i < len_data ; i++) // data index
+    {
+        P_cc[i] = gsl_matrix_alloc(4,4);
+        px_c[i] = gsl_matrix_alloc(4,2);
+
+
+        for (int j = 0 ; j < 4 ; ++j) // marker corner position
+        {
+            gsl_matrix_get_row(corners_j, corners, j);
+            gsl_matrix_get_row(M0_i, param->M0, i);
+            gsl_blas_dgemv(CblasNoTrans, 1.0, R_m, corners_j, 1.0, M0_i);
+
+            for (int k = 0; k < 3; k++) {
+                gsl_vector_set(row_tmpP_cc, k, gsl_vector_get(M0_i, k));
+            }
+
+            gsl_vector_set(row_tmpP_cc, 3, 1.0);
+            gsl_blas_dgemv(CblasNoTrans, 1.0, T_bb, row_tmpP_cc, 0.0, row_P_cc);
+            gsl_blas_dgemv(CblasNoTrans, 1.0, param->T_cb[i], row_P_cc, 0.0, row_tmpP_cc);
+            gsl_blas_dgemv(CblasNoTrans, 1.0, T_cc, row_tmpP_cc, 0.0, row_P_cc);
+
+            if(gsl_vector_get(row_P_cc,2) < 0)
+            {
+                gsl_vector_set(row_P_cc, 1, -gsl_vector_get(row_P_cc, 1));
+                gsl_vector_set(row_P_cc, 2, -gsl_vector_get(row_P_cc, 2));
+            }
+
+            gsl_matrix_set_row(P_cc[i], j, row_P_cc);
+
+            /* calculate corner position in pixels */
+            gsl_blas_dgemv(CblasNoTrans, 1.0, K_c, row_P_cc, 0.0, row_x_c);
+            gsl_matrix_set(px_c[i], j, 0, gsl_vector_get(row_x_c,0) / gsl_vector_get(row_x_c,2));
+            gsl_matrix_set(px_c[i], j, 1, gsl_vector_get(row_x_c,1) / gsl_vector_get(row_x_c,2));
+
+            gsl_vector_set(row_x_c,0, gsl_vector_get(row_x_c,0) / gsl_vector_get(row_x_c,2));
+            gsl_vector_set(row_x_c,1, gsl_vector_get(row_x_c,1) / gsl_vector_get(row_x_c,2));
+        }
+    }
+
+    /* first we need to rearrange the matrix px_c into two matrix length_data*4 : px_c1 and px_c2 */
+    gsl_matrix* px_c1 = gsl_matrix_alloc(len_data,4);
+    gsl_matrix* px_c2 = gsl_matrix_alloc(len_data,4);
+    gsl_vector* tmpcol = gsl_vector_alloc(4);
+    for (int i = 0; i < len_data; i++)
+    {
+        gsl_matrix_get_col(tmpcol,px_c[i],0);
+        gsl_matrix_set_row(px_c1,i,tmpcol);
+        gsl_matrix_get_col(tmpcol,px_c[i],1);
+        gsl_matrix_set_row(px_c2,i,tmpcol);
+    }
+
+    /* deviation between calculated positions and detected positions */
+    gsl_matrix* uv1 = gsl_matrix_alloc(len_data,4);
+    gsl_matrix* uv2 = gsl_matrix_alloc(len_data,4);
+    gsl_matrix_memcpy(uv1,px_c1);
+    gsl_matrix_memcpy(uv2,px_c2);
+    gsl_matrix_sub(uv1,param->px1);
+    gsl_matrix_sub(uv2,param->px2);
+
+    /* mean deviation: this is camera pixel offset */
+    gsl_vector* u = gsl_vector_alloc(4*len_data);
+    gsl_vector* v = gsl_vector_alloc(4*len_data);
+    for (int i = 0 ; i < 4; i++)
+    {
+        for (int j = 0 ; j < len_data ; j++)
+        {
+            gsl_vector_set(u,i*len_data+j,gsl_matrix_get(uv1,j,i));
+            gsl_vector_set(v,i*len_data+j,gsl_matrix_get(uv2,j,i));
+        }
+    }
+
+    /* setting the returned values */
+    double mean_u = vector_mean(u);
+    double std_u = vector_std(u);
+    double mean_v = vector_mean(v);
+    double std_v = vector_std(v);
+    
+
+    /* standard deviation: of pixel offsets <- this is minimization target */
+    vector_variance_element(u);
+    vector_variance_element(v);
+
+    gsl_vector_add(u,v);
+    vector_sqrt_element(u);
+    double std_uv = vector_mean(u);
+
+    gsl_vector_set(other_res,0,mean_u);
+    gsl_vector_set(other_res,1,mean_v);
+    gsl_vector_set(other_res,2,std_u);
+    gsl_vector_set(other_res,3,std_v);
+    gsl_vector_set(other_res,4,std_uv);
+
+    gsl_vector_memcpy(res_u,u);
+    gsl_vector_memcpy(res_v,v);
+
+    return 0;
+
+}
+
 // this function will find the optimal camera parameters
 int optimizer(parameters* param)
 {
-    /* setup of the random generator */
+    /* setting the random generator */
     gsl_rng* rand_gen = gsl_rng_alloc(gsl_rng_taus); // the generator is a Tausworthe generator
     gsl_rng_set(rand_gen,0); // the seed used is the default seed
-
-    /* setup of the optimizer */
-    const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2; // the Nelder-Mead Simplex algorithm is used
-    gsl_multimin_fminimizer* optimizer = gsl_multimin_fminimizer_alloc(T, 16);
 
     /* set the initial step size to 1.0 */
     gsl_vector* ss = gsl_vector_alloc (16);
@@ -866,30 +1070,69 @@ int optimizer(parameters* param)
     gsl_vector* X0 = gsl_vector_alloc(sizeX0);
     double random_double;
 
-    //* setting of the minex function*/
-    //gsl_multimin_function minex_func;
-    //minex_func.n = 16;
-    //minex_func.f = test;
-    //mouble par[] = {2};
-    //minex_func.params = par;
+    //* setting the cost function*/
+    gsl_multimin_function cost;
+    cost.n = 16;
+    cost.f = &cost_function;
+    cost.params = param;
 
+    /* setting the minimizer */
+    const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2; // the Nelder-Mead Simplex algorithm is used
+    gsl_multimin_fminimizer* optimizer = gsl_multimin_fminimizer_alloc(T, 16);
+    gsl_multimin_fminimizer_set(optimizer,&cost,X0,ss);
 
-    /* setting of the minimizer */
-    //gsl_multimin_fminimizer_set(optimizer,&minex_func,X0,ss);
+    /* setting the parameters of the optimization loop */
+    double final_val = INFINITY;
+    gsl_vector* final_vector = gsl_vector_alloc(16);
+    int status;
+    double size;
 
     /* loop because the algorithm used is the Nelder-Mead method which is really sensitive to local minimum */
-    //for (int i = 0 ; i < parameters.repeat_no ; i++)
-    for (int i = 0 ; i < 1 ; i++)
+    for (int iter = 0 ; iter < param->repeat_no ; iter++)
+    //for (int iter = 0 ; iter < 1 ; iter++)
     {
         /* X0 is initialized randomly for each iteration */
         for(int k = 0 ; k < sizeX0 ; k++)
         {
             gsl_vector_set(X0,k,gsl_rng_uniform(rand_gen)-0.5);
         }
-        param->marker_rotation = 180;
-        gsl_vector_set_all(X0,0.5);
-        _cost_function(X0,param);
+
+        /* setting the angle a the maker, in our exemple it is 180 degrees */
+        for (int j = 0 ; j < 1 ; j++)
+        {
+            param->marker_rotation = 180; // 90*j
+
+            for (int k = 0 ; k < 100 ; k++)
+            {
+                status = gsl_multimin_fminimizer_iterate(optimizer);
+
+                if (status)
+                    break;
+
+                size = gsl_multimin_fminimizer_size(optimizer);
+                status = gsl_multimin_test_size(size, 1e-3);
+
+
+            }
+         if(optimizer->fval < final_val)
+         {
+             final_val = optimizer->fval;
+             gsl_vector_memcpy(final_vector,optimizer->x);
+         }
+
+        }
+        printf("iter : %d/%d ; fval : %.4f ; min val : %.4f\n",iter,param->repeat_no,optimizer->fval, final_val);
     }
+    printf("- final val = %.4f\n",final_val);
+    print_vector(final_vector);
+
+    gsl_vector* u = gsl_vector_alloc(84);
+    gsl_vector* v = gsl_vector_alloc(84);
+    gsl_vector* other = gsl_vector_alloc(5);
+    calc_offset(final_vector,param,u,v,other);
+    printf("other res, i : %d\n",other->size);
+    print_vector(other);
+    //TODO : pourquoi ca ne marche pas ???
 
     return 0;
 }

@@ -43,10 +43,11 @@ struct parameters
     double range_dpx;       // deviation scale of pixel offset
     double range_angle;     // deviation scale of pixel angular offsets
     double marker_rotation; // marker rotation - marker may positioned with 0, 90, 180, 270 degrees rotation
-    gsl_matrix *px1,*px2, *M0, *f;    // values derived from transform matrix
-    gsl_matrix* T_cb[]; // array of matrix
     int minval; // initial minimum value
     int repeat_no;
+    gsl_matrix *px1,*px2, *M0, *f;    // values derived from transform matrix
+    gsl_matrix* T_cb[]; // array of matrix
+
 };
 
 #endif //ROBOT_CAMERA_CALIBRATION_UTILS_STRUCT_H

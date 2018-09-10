@@ -23,7 +23,7 @@ int main() {
 
     //Optimization of the parameters
     optimizer(&param);
-    //printf("- optimizing the parameters done\n");
+    printf("- optimizing the parameters done\n");
 
     printf("- end\n");
 

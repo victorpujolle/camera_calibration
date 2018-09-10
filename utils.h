@@ -41,6 +41,9 @@ int print_vector(const gsl_vector* vect);
 // computes the mean of the vector
 double vector_mean(const gsl_vector* u);
 
+// computes the std of the vector
+double vector_std(const gsl_vector* u);
+
 // this function modifies the input vector u <- (u- mean(u)).^2
 int vector_variance_element(gsl_vector* u);
 
@@ -64,7 +67,10 @@ gsl_matrix* Rot_zxz(const double thetad, const double phid, const double psid);
 parameters set_parameters(gsl_matrix* calib_data, double range_dm=0.10, double range_dc=0.05, double range_df=30, double range_dpx=30, double range_angle=10, double inmarker_rotation=0, int minval=100, int repeat_no=50);
 
 // this is the functions one should optimize
-double _cost_function(gsl_vector* X, void* param);
+double cost_function(const gsl_vector *X, void *param);
+
+// this function computes the final offset
+int calc_offset(gsl_vector* X, parameters param, gsl_vector* res_u, gsl_vector* res_v, gsl_vector* other_res);
 
 // this function will find the optimal camera parameters
 int optimizer(parameters* param);
