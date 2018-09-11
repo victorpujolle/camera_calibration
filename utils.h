@@ -38,6 +38,9 @@ int print_matrix(const gsl_matrix *mat);
 // this function prints a gsl vector
 int print_vector(const gsl_vector* vect);
 
+// this function prints a gsl vector but on a line
+int print_vector_online(const gsl_vector* vect);
+
 // computes the mean of the vector
 double vector_mean(const gsl_vector* u);
 
@@ -64,7 +67,7 @@ gsl_matrix* Rotd_axis(const int axis, const double q);
 gsl_matrix* Rot_zxz(const double thetad, const double phid, const double psid);
 
 // this function initialize the struct parameters
-parameters set_parameters(gsl_matrix* calib_data, double range_dm=0.10, double range_dc=0.05, double range_df=30, double range_dpx=30, double range_angle=10, double inmarker_rotation=0, int minval=100, int repeat_no=50);
+parameters set_parameters(gsl_matrix* calib_data, double range_dm=0.10, double range_dc=0.05, double range_df=30, double range_dpx=30, double range_angle=10, double inmarker_rotation=0, int minval=100, int repeat_no=30);
 
 // this is the functions one should optimize
 double cost_function(const gsl_vector *X, void *param);
@@ -73,7 +76,7 @@ double cost_function(const gsl_vector *X, void *param);
 int calc_offset(gsl_vector* X, parameters param, gsl_vector* res_u, gsl_vector* res_v, gsl_vector* other_res);
 
 // this function will find the optimal camera parameters
-int optimizer(parameters* param);
+int optimizer(parameters* param, int verb=0);
 
 
 #endif //ROBOT_CAMERA_CALIBRATION_UTILS_H
